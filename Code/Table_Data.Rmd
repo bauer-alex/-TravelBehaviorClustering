@@ -1,0 +1,506 @@
+---
+title: "Data Referenced and Displayed in Tables"
+output: html_document
+---
+
+This document contains the numbers referenced in the text of the paper and the data displayed in its tables. 
+
+**Note: The row index corresponds to the cluster number.**
+
+```{r, include = FALSE}
+library(knitr)
+library(kableExtra)
+library(tidyverse)
+library(APCtools)
+source("Functions.R")
+
+knitr::opts_chunk$set(echo = TRUE)
+
+
+# Load data used in paper 
+# Important: Run Main_Analysis first before running this script. Otherwise these objects do not exist
+analysis_data <- readRDS(
+  file = "../Results/Statistical_Modelling/analysis_data.rds"
+)
+models <- readRDS(
+  file = "../Results/Statistical_Modelling/Models_hard.rds"
+)
+```
+
+```{r, include = FALSE}
+# Functions to display tables
+
+# Plot Table as _p_retty _kable_ -> pable
+pable = function(contingency_table){
+  rounded_margintable <- round(
+      addmargins(
+        conditional_marginals <- prop.table(contingency_table, margin = 1), 
+        margin = 2
+        ), 
+      digits = 3
+    )
+  
+  rounded_kable = kable(
+    rounded_margintable, 
+    row.names = TRUE, 
+    format = "markdown"
+  )
+  return(kable_styling(kable_input = rounded_kable, full_width = TRUE, position = "left"))
+}
+
+
+# Extract acitvity names 
+get_names = function(names_vector){
+  
+  # Given a single temp_string, extract the name from it
+  get_name = function(name, index_list){
+    out = substring(name, 
+      first = 1 + index_list[1],
+      last = -1 + index_list[-1]
+    )
+    return(out)
+  }
+  
+  temp = sub(x = names_vector, pattern = 'UA_OB', replace='')
+  underscore_positions = gregexpr(pattern ='_', temp)
+  out = mapply(get_name, name = temp, index_list = underscore_positions)
+  return(out)
+}
+
+# Define a function to capitalize the first letter of each word
+title_case <- function(s) {
+  s <- tolower(s) # Ensure all letters are lowercase first
+  s <- gsub("(^|[[:space:]])([[:alpha:]])", "\\1\\U\\2", s, perl = TRUE)
+  return(s)
+}
+```
+
+
+### Destination
+Fractions of travel destinations (columns) for each cluster (row).
+
+```{r}
+contingency_table <- table(analysis_data$clustering, analysis_data$HUR_Reiseziel_Clustering)
+colnames(contingency_table) <- title_case(colnames(contingency_table))
+pable(contingency_table)
+```
+
+### Travel frequency
+
+Columns are the number of travel is previous years / two years / three years ago.
+
+The number of 3.3 travels represents "three or more" travels:
+After 1991, numerical data on how many travels per year available. Before, only categorical.
+3.3 is average number of travels in the 90s for those who traveled 3 times or more often.
+Before 1991, the category "three or more travels" has been transformed to 3.3 as well.
+
+1. Number of trips in previous year
+
+```{r}
+# Rescale factors from analysed data
+levels(analysis_data$RH_VJ) = as.numeric(levels(analysis_data$RH_VJ)) * 2.3 + 1
+# Plot table
+contingency_table = table(analysis_data$clustering, analysis_data$RH_VJ)
+pable(contingency_table)
+```
+
+2. Number of trips two years ago
+
+```{r}
+# Rescale factors from analysed data
+contingency_table = table(analysis_data$clustering, analysis_data$RH_2J * 3.3)
+pable(contingency_table)
+```
+
+3. Number of trips three years ago
+
+```{r}
+# Rescale factors from analysed data
+contingency_table = table(analysis_data$clustering, analysis_data$RH_3J * 3.3)
+pable(contingency_table)
+```
+
+### Length of stay
+
+Distribution of the longest trip ("Max_Reisedauer") within each cluster.
+
+Translation of columns:
+
+- bis 5 Tage: Up to 5 days
+
+- x bis y Tage: Between x and y days
+
+- 30 Tage und mehr: Up to 30 days and more
+
+- keine Angabe: No specification
+
+```{r}
+contingency_table <- table(analysis_data$clustering, analysis_data$JS_Max_Reisedauer)
+pable(contingency_table)
+```
+
+
+
+###  Activities
+
+Until and including 1995, the activity data is based on main trip. After 1995, the data is based on all trips. Displayed variables are calculated based on both, before 1995 and after.
+
+The following table considers the averages over the corresponding variable.
+
+Translation of columns:
+
+1. Regeneration: regeneration
+
+2. Soziales: social activities
+
+3. Eigeninteresse: self-interests
+
+4. Ausflug: excursion
+
+4.1. (subcategory excursion) Kultur: culture
+
+4.2. (subcategory excursion) Genuss: culinary
+
+4.3. (subcategory excursion) Naturattraktionen: nature
+
+4.4. (subcategory excursion) Freizeiteinrichtungen: leisure facilities
+
+4.5. (subcategory excursion) Sport: Sports
+
+```{r, include = FALSE}
+vars_UA = grep("UA_OB", colnames(analysis_data), value = "TRUE")
+var_vec = grep("_clustering", vars_UA, value = "TRUE")
+```
+
+```{r}
+analysis_data |>
+    group_by(clustering) |>
+    summarise(
+      across(
+        .cols = all_of(var_vec),
+        .names = "{get_names(.col)}",
+        .fns = list(mean = ~mean(.x, na.rm = TRUE))
+      )
+    ) |> 
+  kable(format = "markdown", digits = 4) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+
+
+### Vacation type
+
+Avaiable after 1983. No data for 1993 and 1994.
+
+**Type of travel**
+
+7 Categories: 
+
+1. Gesund = Health 
+
+2. Aktiv = Activity 
+
+3. Bildung = Education 
+
+4. Schiff  = Cruise 
+
+5. Sight  = Sightseeing 
+
+6. Familie  = Family 
+
+7. Strand = Beach 
+
+```{r, results = "asis"}
+multi_cats = c(
+  "UF_cluster_Gesund",
+  "UF_cluster_Aktiv",
+  "UF_cluster_Bildung",
+  "UF_cluster_Schiff",
+  "UF_cluster_Sight",
+  "UF_cluster_Familie",
+  "UF_cluster_Strand"
+)
+
+index = 1
+for (category in multi_cats){
+  cat(index, ".", sub(pattern = "UF_cluster_", x = category, replacement = ""))
+
+  contingency_table = table(analysis_data$clustering, analysis_data[, category])
+  print(pable(contingency_table))
+  index = index + 1 
+  cat("\n")
+}
+```
+
+**Type of organization of main trip**
+
+Translations:
+
+1. Pauschalreise = Package trip
+
+2. Selbst organisiert = Individual trip
+
+3. keine Angabe = No specification
+
+
+```{r}
+contingency_table = table(analysis_data$clustering, analysis_data$JS_HUR_Organisationsform)
+pable(contingency_table)
+```
+
+### Accommodation
+
+Translations:
+
+1. Hotel = hotel
+
+2. Ferienhaus = vacation home
+
+3. private =  accommodations  Privatzimmer 
+
+4. Hostel  = hostel  
+
+5. Camping  = camping 
+
+6. Schiff = cruise ship 
+
+7. Bauernhof = farm vacation 
+
+8. Kur = sanatorium 
+
+9. Ferienanlage = vacation resort 
+
+10. Sonstiges = other 
+
+```{r, results = "asis"}
+vars_Uk = grep("JS_Unterkunft", colnames(analysis_data), value = "TRUE")
+
+index = 1
+for (unterkunft in vars_Uk){
+  cat(index, ". ", sub(pattern = "JS_Unterkunft_", x = unterkunft, replacement = ""))
+  index = index + 1
+
+  contingency_table = table(analysis_data$clustering, analysis_data[, unterkunft])
+  print(pable(contingency_table))
+  cat("\n")
+}
+```
+
+### Sonstiges
+
+```{r}
+contingency_table = table(
+  analysis_data$clustering,
+  (analysis_data |> mutate(other = as.numeric(JS_HUR_Unterkunft == "Sonstiges", .keep = "used")))$other
+)
+pable(contingency_table)
+```
+
+# Means of transport
+
+Translations: 
+
+1. Indiviual = motorized private transport 
+
+2. Wohnwagen = caravan 
+
+3. Bahn = train 
+
+4. Bus = bus 
+
+5. Flugzeug = airplane 
+
+6. Schiff = ship cruise 
+
+7. Fahrrad = bicycle 
+
+8. Sonstiges = other 
+
+```{r, results = "asis"}
+vars_Vk = grep("JS_Verkehrsmittel", colnames(analysis_data), value = "TRUE")
+
+index = 1
+for (mittel in vars_Vk){
+  cat(index, ". ", sub(pattern = "JS_Verkehrsmittel_", x = mittel, replacement = ""))
+  index = index + 1
+
+  contingency_table = table(analysis_data$clustering, analysis_data[, mittel])
+  print(pable(contingency_table))
+  cat("\n")
+}
+```
+
+### Sonstiges
+
+```{r}
+contingency_table = table(
+  analysis_data$clustering,
+  (analysis_data |> mutate(other = as.numeric(JS_HUR_Verkehrsmittel == "Sonstiges", .keep = "used")))$other
+)
+pable(contingency_table)
+```
+
+### Travel companions
+
+HH = People from own household
+
+nichtHH = People from other households
+
+Kind = Children
+
+```{r, results = "asis"}
+vars_Begleitung = grep("Begl", colnames(analysis_data), value = "TRUE")
+vars_Begleitung = vars_Begleitung[!grepl("Anteil", vars_Begleitung)]
+
+index = 0
+for (begleitung in vars_Begleitung){
+  cat(index , ". ", sub(pattern = "Begleitung_", x = begleitung, replacement = ""))
+  index = index + 1
+
+  contingency_table = table(analysis_data$clustering, analysis_data[, begleitung])
+  print(pable(contingency_table))
+  cat("\n")
+}
+```
+
+### Travel expenses
+
+```{r}
+# Note: The travel expenses were limited to the 95% quantile. That means, every expense larger the Q95 (i.e. 4133.5EUR) has been set to 4133.5EUR
+analysis_data |>
+  summarise(
+    # Ausgaben_sum is expressed as fraction of the Q95 = 4133.5
+    effective_ausgabenSum = mean(Ausgaben_sum * 4133.5, na.rm = TRUE),
+    .by = clustering
+  ) |>
+  arrange(clustering) |> 
+  kable(format = "markdown", digits = 4) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+
+
+## Specific values for Odds
+
+Identify the values of interest for the Plot in paper. 
+
+```{r, warning=FALSE}
+dat = analysis_data |> dplyr::mutate(age = S_Alter, period = travel_year)
+plots_APC = plot_models_APC(analysis_data, models)
+plots_APC
+```
+
+```{r, include = FALSE}
+# We are especially interested in the values for the two plots of Age and Period. 
+# Create a data.frame for each of these:
+table_age = data.frame(
+  age = min(dat$age):max(dat$age),
+  (plot_marginalAPCeffects(models$`Cluster 1`, dat, return_plotData = TRUE))$dat_age["effect"],
+  (plot_marginalAPCeffects(models$`Cluster 2`, dat, return_plotData = TRUE))$dat_age["effect"],
+  (plot_marginalAPCeffects(models$`Cluster 3`, dat, return_plotData = TRUE))$dat_age["effect"],
+  (plot_marginalAPCeffects(models$`Cluster 4`, dat, return_plotData = TRUE))$dat_age["effect"],
+  (plot_marginalAPCeffects(models$`Cluster 5`, dat, return_plotData = TRUE))$dat_age["effect"]
+)
+names(table_age) = c("Age", "C1", "C2", "C3", "C4", "C5")
+
+table_period = data.frame(
+  period = min(dat$period):max(dat$period),
+  (plot_marginalAPCeffects(models$`Cluster 1`, dat, return_plotData = TRUE))$dat_period["effect"],
+  (plot_marginalAPCeffects(models$`Cluster 2`, dat, return_plotData = TRUE))$dat_period["effect"],
+  (plot_marginalAPCeffects(models$`Cluster 3`, dat, return_plotData = TRUE))$dat_period["effect"],
+  (plot_marginalAPCeffects(models$`Cluster 4`, dat, return_plotData = TRUE))$dat_period["effect"],
+  (plot_marginalAPCeffects(models$`Cluster 5`, dat, return_plotData = TRUE))$dat_period["effect"]
+)
+names(table_period) = c("Period", "C1", "C2", "C3", "C4", "C5")
+```
+### Age effects
+
+```{r}
+kable(table_age) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+
+Age for max value in Cluster 1:
+```{r}
+kable(table_age |> dplyr::filter(C1 == max(C1))) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+Age for max value in Cluster 2:
+```{r}
+kable(table_age |> dplyr::filter(C2 == max(C2))) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+
+Minimum of cluster 3
+```{r}
+kable(table_age |> dplyr::filter(C3 == min(C3))) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+
+For cluster 4, we obtain a bimodal age effect with a tourist's tendency to belong to this cluster being lowest at age 20 (OR X) and highest at age 40 (OR X) with a second peak at age 60 (OR X).
+```{r}
+kable(table_age |> dplyr::filter(C4 == min(C4))) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+```{r}
+kable(table_age |> dplyr::filter(Age <= 50) |> dplyr::filter(C4 == min(C4))) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+```{r}
+kable(table_age |> dplyr::filter(C4 == max(C4))) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+
+
+
+### Period effects
+
+```{r}
+kable(table_period)|> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+
+
+Chance to belong to C1 in 1983 and 2018
+```{r}
+kable(table_period |> dplyr::filter(Period %in% c(1983, 2018))) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+Ratio:
+```{r}
+1.463427 / 0.425067
+```
+Compare Clusters in 1983
+```{r}
+kable(table_period |> dplyr::filter(Period == 1983)) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+
+The period effect shows that the chance to belong to cluster 3 started high in 1983 (OR X), declined steeply until 2009 (??)
+```{r}
+kable(table_period |> dplyr::filter(Period == 1983)) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+
+```{r}
+kable(table_period |> dplyr::filter(C3 == min(C3))) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
+
+### Destination Popularity
+
+Variable "Erschlossenheit" corresponds to Popularity. 
+
+```{r}
+kable( analysis_data |> 
+  summarise(
+    min = min(Erschlossenheit),
+    median = median(Erschlossenheit),
+    mean = mean(Erschlossenheit),
+    max = max(Erschlossenheit),
+    .by = clustering
+  ) |> 
+  arrange(
+    clustering
+  )
+) |> 
+  kable_styling(full_width = TRUE, position = "left")
+```
