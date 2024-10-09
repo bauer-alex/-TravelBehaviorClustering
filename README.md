@@ -1,5 +1,4 @@
-Overview
-------------
+## Overview
 
 This is the accompanying code repository for the paper Bartl et al. (2025) - ''Understanding Travel Behaviour Patterns and Their Dynamics: 
 Applying Fuzzy Clustering and Age-Period-Cohort Analysis on Long-Term Data of German Travellers''.
@@ -18,7 +17,7 @@ Folder structure:
 - Results: Practically empty folder in which the result objects will be saved when running the code
 
 
-# Notes on how to run the code
+## Notes on how to run the code
 
 1. In case you want to call the `Main_Analysis.R` code on a (Linux) server, you should
 run the following call in a Terminal, from the parent folder:
